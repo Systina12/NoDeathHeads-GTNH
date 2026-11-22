@@ -1,34 +1,64 @@
-name: Publish v1.0.0 release
+name: Build and publish
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/publish-release.yml
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      jar: ${{ steps.version.outputs.jar }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate release artifact
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and test the release JAR
+        run: bash build/build.sh
+      - name: Read the release version
+        id: version
         run: |
-          test -f NoDeathHeads-GTNH-1.0.0.jar
-          echo "1365ed7792c630f25b8ff51d3d07dc4941f664fc7ad1aa01b53b048003982f6d  NoDeathHeads-GTNH-1.0.0.jar" | sha256sum -c -
-          unzip -t NoDeathHeads-GTNH-1.0.0.jar
-      - name: Publish versioned GitHub Release
+          version=$(jq -er '.[0].version' src/main/resources/mcmod.info)
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "jar=NoDeathHeads-GTNH-$version.jar" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NoDeathHeads-GTNH
+          path: build/dist/${{ steps.version.outputs.jar }}
+          if-no-files-found: error
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency: release-${{ needs.build.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NoDeathHeads-GTNH
+      - name: Publish a new version
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+          JAR: ${{ needs.build.outputs.jar }}
         run: |
-          if gh release view v1.0.0 >/dev/null 2>&1; then
-            gh release upload v1.0.0 NoDeathHeads-GTNH-1.0.0.jar --clobber
-          else
-            gh release create v1.0.0 NoDeathHeads-GTNH-1.0.0.jar \
-              --target "$GITHUB_SHA" \
-              --title "No Death Heads v1.0.0 — GTNH 2.9.0" \
-              --notes "Server-side Forge 1.7.10 mod for GT New Horizons 2.9.0. Filters a deceased player's own head from death drops and OpenBlocks grave contents while preserving graves and equipment recovery. Install the JAR in the server's mods directory; clients do not need this mod."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            exit 0
           fi
+          gh release create "$TAG" "$JAR" \
+            --target "$GITHUB_SHA" \
+            --title "No Death Heads $TAG — GTNH 2.9.0" \
+            --notes "Server-side Forge 1.7.10 mod for GT New Horizons 2.9.0. Suppresses Tinkers' Construct player death heads, preserves carried items, and retains OpenBlocks graves. Install the JAR in the server's mods directory."
