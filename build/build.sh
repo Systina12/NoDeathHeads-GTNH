@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p build/classes build/stubs/classes build/testclasses
+python3 build/write_stubs.py
 find build/stubs/src -name '*.java' > build/stubs-sources.txt
 javac --release 8 -d build/stubs/classes @build/stubs-sources.txt
 find src/main/java -name '*.java' > build/mod-sources.txt
