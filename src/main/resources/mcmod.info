@@ -1,0 +1,11 @@
+[
+  {
+    "modid": "nodeathheads",
+    "name": "No Death Heads (GTNH)",
+    "description": "Suppresses deceased players' head drops in OpenBlocks graves and regular player drops. Preserves graves, equipment, and heads belonging to other players.",
+    "version": "1.0.0",
+    "mcversion": "1.7.10",
+    "authorList": ["GTNH server utility"],
+    "dependencies": ["OpenBlocks"]
+  }
+]
