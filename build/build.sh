@@ -11,5 +11,5 @@ javac --release 8 -cp build/stubs/classes:build/classes -d build/testclasses tes
 java -cp build/stubs/classes:build/classes:build/testclasses dev.gtnh.nodeathheads.NoDeathHeadsTest
 python3 build/reobf_srg.py
 cp src/main/resources/mcmod.info build/classes/mcmod.info
-jar --create --file ../NoDeathHeads-GTNH-1.0.0.jar -C build/classes .
-jar --list --file ../NoDeathHeads-GTNH-1.0.0.jar
+jar --create --file NoDeathHeads-GTNH-1.0.0.jar -C build/classes .
+jar --list --file NoDeathHeads-GTNH-1.0.0.jar
