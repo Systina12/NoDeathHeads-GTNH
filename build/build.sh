@@ -5,10 +5,10 @@ cd "$(dirname "$0")/.."
 download() {
     local url="$1" checksum="$2"
     local file="build/dependencies/${url##*/}"
-    if ! sha256sum --check --status <<< "$checksum  $file" 2>/dev/null; then
+    if [[ ! -f "$file" ]] || ! sha256sum --check --status <<< "$checksum  $file" >/dev/null 2>&1; then
         curl --fail --silent --show-error --location --retry 3 "$url" --output "$file.part" || return
         sha256sum --check <<< "$checksum  $file.part" >&2 || return
-        mv "$file.part" "$file"
+        mv "$file.part" "$file" || return
     fi
     printf '%s\n' "$file"
 }
