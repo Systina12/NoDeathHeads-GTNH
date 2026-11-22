@@ -1,0 +1,6 @@
+build/classes/
+build/stubs/
+build/testclasses/
+build/*-sources.txt
+*.log
+*.heapdump
