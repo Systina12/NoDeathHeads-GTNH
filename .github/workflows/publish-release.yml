@@ -1,0 +1,34 @@
+name: Publish v1.0.0 release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release artifact
+        run: |
+          test -f NoDeathHeads-GTNH-1.0.0.jar
+          echo "1365ed7792c630f25b8ff51d3d07dc4941f664fc7ad1aa01b53b048003982f6d  NoDeathHeads-GTNH-1.0.0.jar" | sha256sum -c -
+          unzip -t NoDeathHeads-GTNH-1.0.0.jar
+      - name: Publish versioned GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.0.0 >/dev/null 2>&1; then
+            gh release upload v1.0.0 NoDeathHeads-GTNH-1.0.0.jar --clobber
+          else
+            gh release create v1.0.0 NoDeathHeads-GTNH-1.0.0.jar \
+              --target "$GITHUB_SHA" \
+              --title "No Death Heads v1.0.0 — GTNH 2.9.0" \
+              --notes "Server-side Forge 1.7.10 mod for GT New Horizons 2.9.0. Filters a deceased player's own head from death drops and OpenBlocks grave contents while preserving graves and equipment recovery. Install the JAR in the server's mods directory; clients do not need this mod."
+          fi
