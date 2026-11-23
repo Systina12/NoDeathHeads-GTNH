@@ -2,10 +2,10 @@
   {
     "modid": "nodeathheads",
     "name": "No Death Heads (GTNH)",
-    "description": "Suppresses player death heads from Tinkers' Construct and preserves OpenBlocks graves and carried items.",
-    "version": "1.0.1",
+    "description": "Replaces player death heads from Tinkers' Construct with one cobblestone.",
+    "version": "1.0.2",
     "mcversion": "1.7.10",
     "authorList": ["GTNH server utility"],
-    "dependencies": ["TConstruct", "OpenBlocks"]
+    "dependencies": ["TConstruct"]
   }
 ]
