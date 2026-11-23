@@ -11,22 +11,31 @@ import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin;
 import net.minecraft.launchwrapper.IClassTransformer;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.BasicVerifier;
 
 public final class NoDeathHeadsTest {
+    private static final String TINKER_EVENTS = "tconstruct.tools.TinkerToolEvents";
+
     public static void main(String[] args) throws Exception {
         IClassTransformer transformer = loadTransformer(args[0]);
-        verifyTinkerDrops(transformer, args[1]);
-        verifyGravesUnmodified(transformer, args[2], "openblocks.common.PlayerDeathHandler");
-        verifyGravesUnmodified(transformer, args[2], "openblocks.common.tileentity.TileEntityGrave");
-        System.out.println("PASS: packaged coremod replaces player heads and leaves OpenBlocks intact");
+        for (int i = 1; i < args.length; i += 2) {
+            byte[] tinker = loadClass(args[i], TINKER_EVENTS);
+            verifyTinkerDrops(transformer, tinker);
+            verifyGravesUnmodified(transformer, args[i + 1], "openblocks.common.PlayerDeathHandler");
+            verifyGravesUnmodified(transformer, args[i + 1], "openblocks.common.tileentity.TileEntityGrave");
+            System.out.println("PASS: " + args[i] + " and " + args[i + 1]);
+        }
+        verifyFallbacks(transformer, loadClass(args[1], TINKER_EVENTS));
+        System.out.println("PASS: missing or changed player-head drops preserve the original class");
     }
 
     private static IClassTransformer loadTransformer(String path) throws Exception {
@@ -43,11 +52,9 @@ public final class NoDeathHeadsTest {
         }
     }
 
-    private static void verifyTinkerDrops(IClassTransformer transformer, String path) throws Exception {
-        String className = "tconstruct.tools.TinkerToolEvents";
-        byte[] original = loadClass(path, className);
+    private static void verifyTinkerDrops(IClassTransformer transformer, byte[] original) throws Exception {
         ClassNode node = new ClassNode();
-        new ClassReader(transformer.transform(className, className, original)).accept(node, 0);
+        new ClassReader(transformer.transform(TINKER_EVENTS, TINKER_EVENTS, original)).accept(node, 0);
         for (Object entry : node.methods) {
             MethodNode method = (MethodNode) entry;
             if (!"onLivingDrop".equals(method.name)) continue;
@@ -67,6 +74,44 @@ public final class NoDeathHeadsTest {
             return;
         }
         throw new AssertionError("Missing Tinkers' Construct death drop handler");
+    }
+
+    private static void verifyFallbacks(IClassTransformer transformer, byte[] original) {
+        ClassNode changed = new ClassNode();
+        new ClassReader(original).accept(changed, 0);
+        for (Object entry : changed.methods) {
+            MethodNode method = (MethodNode) entry;
+            if (!"onLivingDrop".equals(method.name)) continue;
+            AbstractInsnNode lastDrop = null;
+            FieldInsnNode lastSkull = null;
+            for (AbstractInsnNode instruction : method.instructions.toArray()) {
+                if (instruction instanceof MethodInsnNode && "addDrops".equals(((MethodInsnNode) instruction).name)) {
+                    lastDrop = instruction;
+                }
+                if (instruction instanceof FieldInsnNode && "field_151144_bL".equals(((FieldInsnNode) instruction).name)) {
+                    lastSkull = (FieldInsnNode) instruction;
+                }
+            }
+            check(lastSkull != null && lastDrop != null, "Found the PvP drop in the test fixture");
+            lastSkull.name = "field_151045_i"; // Items.diamond
+            verifyFallback(transformer, changed, "A non-head drop at the same call site is preserved");
+            lastSkull.name = "field_151144_bL";
+            AbstractInsnNode popArguments = new InsnNode(Opcodes.POP2);
+            method.instructions.set(lastDrop, popArguments);
+            verifyFallback(transformer, changed, "Removing one drop call preserves the entire upstream class");
+            method.instructions.set(popArguments, lastDrop);
+            method.name = "renamedDropHandler";
+            verifyFallback(transformer, changed, "A renamed event handler preserves the entire upstream class");
+            return;
+        }
+        throw new AssertionError("Missing Tinkers' Construct death drop handler");
+    }
+
+    private static void verifyFallback(IClassTransformer transformer, ClassNode changed, String message) {
+        ClassWriter writer = new ClassWriter(0);
+        changed.accept(writer);
+        byte[] original = writer.toByteArray();
+        check(Arrays.equals(original, transformer.transform(TINKER_EVENTS, TINKER_EVENTS, original)), message);
     }
 
     private static boolean isCobblestoneDrop(MethodInsnNode drop) {

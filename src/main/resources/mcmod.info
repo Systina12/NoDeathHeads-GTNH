@@ -3,7 +3,7 @@
     "modid": "nodeathheads",
     "name": "No Death Heads (GTNH)",
     "description": "Replaces player death heads from Tinkers' Construct with one cobblestone.",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "mcversion": "1.7.10",
     "authorList": ["GTNH server utility"],
     "dependencies": ["TConstruct"]
